@@ -206,7 +206,7 @@ point getRandPoint(void)
 	return p;
 }
 
-static point points[POINT_COUNT];
+static point *points;
 
 struct update_thread_info {
 	size_t offset;
@@ -265,7 +265,12 @@ signed int main(const signed int argc , const char **argv)
 	glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
 
 	srand(time(NULL));
-	// points = malloc(sizeof(point)*POINT_COUNT);
+	points = malloc(sizeof(point)*POINT_COUNT);
+	if (!points) {
+		glfwDestroyWindow(window);
+		glfwTerminate();
+		return -15;
+	}
 	for (auto unsigned long x = 0; x < POINT_COUNT; x++) {
 		#ifndef DO_BATCHES
 			auto point p = getRandPoint();
