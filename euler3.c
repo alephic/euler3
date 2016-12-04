@@ -7,6 +7,8 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 #include <assert.h>
@@ -168,22 +170,13 @@ float updatePoint(size_t point_index)
 
 	const float vel = sqrt(dx_*dx_ + dy_*dy_ + dz_*dz_);
 
-	auto float r,g,b;
-	HSVtoRGB(&r,&g,&b, 240 - (vel/highestSpeed)*240, 1.0, 1.0);
-	p->r = r;
-	p->g = g;
-	p->b = b;
+	//auto float r,g,b;
+	//HSVtoRGB(&r,&g,&b, 240 - (vel/highestSpeed)*240, 1.0, 1.0);
+	p->r = 1.0f;
+	p->g = 1.0f;
+	p->b = 1.0f;
 
 	return vel;
-}
-
-point getRandPoint(void)
-{
-	const point p = {randRange(-10.0,10.0),
-					randRange(-10.0,10.0),
-					randRange(-10.0,10.0),
-					0.0,0.0,0.0};
-	return p;
 }
 
 struct update_thread_info {
@@ -213,7 +206,6 @@ signed int main(const signed int argc , const char **argv)
 	}
 
 	FILE *inpFile;
-	long int inpFileLen;
 	char *inpBuf;
 	size_t inpCols = 1;
 
@@ -223,32 +215,39 @@ signed int main(const signed int argc , const char **argv)
 		return -6;
 	}
 
-	fseek(inpFile, 0, SEEK_END);
-	inpFileLen = ftell(inpFile);
-	inpBuf = malloc(inpFileLen);
+	struct stat st;
+	if (fstat(fileno(inpFile), &st)) {
+		fclose(inpFile);
+		return -6;
+	}
+
+	inpBuf = (char *) malloc(st.st_size);
 	if (!inpBuf) {
 		fclose(inpFile);
 		return -7;
 	}
 
-	if (fread((void *) inpBuf, inpFileLen, 1, inpFile) != inpFileLen) {
+	if (fread((void *) inpBuf, 1, st.st_size, inpFile) != st.st_size) {
 		fclose(inpFile);
-		fprintf(stderr, "Error reading from input file\n");
 		return -8;
 	}
 	fclose(inpFile);
 
 	char *curr;
 
+	num_time_steps = 0;
+
 	for (curr = inpBuf; *curr != EOF; ++curr) {
 		if (*curr == '\n') {
 			++num_time_steps;
-		} else if (inpRows == 1 && *curr == ' ') {
+		} else if (num_time_steps == 0 && *curr == ' ') {
 			++inpCols;
 		}
 	}
 
 	point_count = inpCols / 3;
+
+	printf("Displaying %lu points for %lu timesteps\n", point_count, num_time_steps);
 
 	input_vecs = malloc(sizeof(vec3f) * point_count * num_time_steps);
 	if (!input_vecs) {
@@ -452,5 +451,7 @@ signed int main(const signed int argc , const char **argv)
 	glDeleteLists(boxList,1);
 	glfwDestroyWindow(window);
 	glfwTerminate();
+	free(input_vecs);
+	free(points);
 	return 0;
 }
