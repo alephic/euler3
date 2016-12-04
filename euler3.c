@@ -21,6 +21,7 @@
 #define TIME_STEP 0.02
 #define MOTION_SCALE 0.02
 #define Q_STEP 0.02
+#define BOX
 
 static float t = 0.0;
 static float q = 0.0;
@@ -233,16 +234,16 @@ signed int main(const signed int argc , const char **argv)
 	}
 	fclose(inpFile);
 
-	char *curr;
-
 	num_time_steps = 0;
+	char *curr = inpBuf;
 
-	for (curr = inpBuf; *curr != EOF; ++curr) {
+	for (size_t i = 0; i < st.st_size; ++i) {
 		if (*curr == '\n') {
 			++num_time_steps;
 		} else if (num_time_steps == 0 && *curr == ' ') {
 			++inpCols;
 		}
+		++curr;
 	}
 
 	point_count = inpCols / 3;
@@ -376,7 +377,8 @@ signed int main(const signed int argc , const char **argv)
 		//if (glGetError())
 		//	break;
 		if (!paused) {
-			t += TIME_STEP;
+			q = fmaxf(0.0f, q);
+			t += TIME_STEP + q;
 			if (((int) floor(t)) >= num_time_steps - 1) {
 				t = 0.0f;
 			}
