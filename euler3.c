@@ -22,6 +22,7 @@
 #define MOTION_SCALE 0.02
 #define Q_STEP 0.02
 #define BOX
+#define BOX_SIZE 200.0f
 
 static float t = 0.0;
 static float q = 0.0;
@@ -311,7 +312,7 @@ signed int main(const signed int argc , const char **argv)
 	auto float xRot = 0.0f;
 	auto float yRot = 0.0f;
 
-	auto float zoom = 1.0f;
+	auto float zoom = 10.0f/BOX_SIZE;
 	glPointSize(1.0);
 
 	glEnableClientState(GL_VERTEX_ARRAY);
@@ -321,53 +322,53 @@ signed int main(const signed int argc , const char **argv)
 	glNewList(boxList, GL_COMPILE);
 	glColor3f(1.0f,1.0f,1.0f);
 			glBegin(GL_LINE_STRIP);
-			glVertex3f(-10.0f,-10.0f,10.0f);
-			glVertex3f(-10.0f,10.0f,10.0f);
-			glVertex3f(10.0f,10.0f,10.0f);
-			glVertex3f(10.0f,-10.0f,10.0f);
-			glVertex3f(-10.0f,-10.0f,10.0f);
+			glVertex3f(-BOX_SIZE,-BOX_SIZE,BOX_SIZE);
+			glVertex3f(-BOX_SIZE,BOX_SIZE,BOX_SIZE);
+			glVertex3f(BOX_SIZE,BOX_SIZE,BOX_SIZE);
+			glVertex3f(BOX_SIZE,-BOX_SIZE,BOX_SIZE);
+			glVertex3f(-BOX_SIZE,-BOX_SIZE,BOX_SIZE);
 			glEnd();
 
 			glBegin(GL_LINE_STRIP);
-			glVertex3f(-10.0f,-10.0f,-10.0f);
-			glVertex3f(-10.0f,10.0f,-10.0f);
-			glVertex3f(10.0f,10.0f,-10.0f);
-			glVertex3f(10.0f,-10.0f,-10.0f);
-			glVertex3f(-10.0f,-10.0f,-10.0f);
+			glVertex3f(-BOX_SIZE,-BOX_SIZE,-BOX_SIZE);
+			glVertex3f(-BOX_SIZE,BOX_SIZE,-BOX_SIZE);
+			glVertex3f(BOX_SIZE,BOX_SIZE,-BOX_SIZE);
+			glVertex3f(BOX_SIZE,-BOX_SIZE,-BOX_SIZE);
+			glVertex3f(-BOX_SIZE,-BOX_SIZE,-BOX_SIZE);
 			glEnd();
 
 			glBegin(GL_LINE_STRIP);
-			glVertex3f(-10.0f,-10.0f,-10.0f);
-			glVertex3f(-10.0f,-10.0f,10.0f);
-			glVertex3f(10.0f,-10.0f,10.0f);
-			glVertex3f(10.0f,-10.0f,-10.0f);
-			glVertex3f(-10.0f,-10.0f,-10.0f);
+			glVertex3f(-BOX_SIZE,-BOX_SIZE,-BOX_SIZE);
+			glVertex3f(-BOX_SIZE,-BOX_SIZE,BOX_SIZE);
+			glVertex3f(BOX_SIZE,-BOX_SIZE,BOX_SIZE);
+			glVertex3f(BOX_SIZE,-BOX_SIZE,-BOX_SIZE);
+			glVertex3f(-BOX_SIZE,-BOX_SIZE,-BOX_SIZE);
 			glEnd();
 
 			glBegin(GL_LINE_STRIP);
-			glVertex3f(-10.0f,10.0f,-10.0f);
-			glVertex3f(-10.0f,10.0f,10.0f);
-			glVertex3f(10.0f,10.0f,10.0f);
-			glVertex3f(10.0f,10.0f,-10.0f);
-			glVertex3f(-10.0f,10.0f,-10.0f);
+			glVertex3f(-BOX_SIZE,BOX_SIZE,-BOX_SIZE);
+			glVertex3f(-BOX_SIZE,BOX_SIZE,BOX_SIZE);
+			glVertex3f(BOX_SIZE,BOX_SIZE,BOX_SIZE);
+			glVertex3f(BOX_SIZE,BOX_SIZE,-BOX_SIZE);
+			glVertex3f(-BOX_SIZE,BOX_SIZE,-BOX_SIZE);
 			glEnd();
 
 			glColor3f(1.0f,0.0f,0.0f);
 			glBegin(GL_LINES);
-			glVertex3f(-9.5f,-10.5f,10.5f);
-			glVertex3f(-10.5f,-10.5f,10.5f);
+			glVertex3f(-BOX_SIZE + (BOX_SIZE/ 5.0f),-BOX_SIZE - (BOX_SIZE/20.0f),BOX_SIZE + (BOX_SIZE/20.0f));
+			glVertex3f(-BOX_SIZE - (BOX_SIZE/20.0f),-BOX_SIZE - (BOX_SIZE/20.0f),BOX_SIZE + (BOX_SIZE/20.0f));
 			glEnd();
 
 			glColor3f(0.0f,1.0f,0.0f);
 			glBegin(GL_LINES);
-			glVertex3f(-10.5f,-9.5f,10.5f);
-			glVertex3f(-10.5f,-10.5f,10.5f);
+			glVertex3f(-BOX_SIZE - (BOX_SIZE/20.0f),-BOX_SIZE + (BOX_SIZE/ 5.0f),BOX_SIZE + (BOX_SIZE/20.0f));
+			glVertex3f(-BOX_SIZE - (BOX_SIZE/20.0f),-BOX_SIZE - (BOX_SIZE/20.0f),BOX_SIZE + (BOX_SIZE/20.0f));
 			glEnd();
 
 			glColor3f(0.0f,0.0f,1.0f);
 			glBegin(GL_LINES);
-			glVertex3f(-10.5f,-10.5f,9.5f);
-			glVertex3f(-10.5f,-10.5f,10.5f);
+			glVertex3f(-BOX_SIZE - (BOX_SIZE/20.0f),-BOX_SIZE - (BOX_SIZE/20.0f),BOX_SIZE - (BOX_SIZE/ 5.0f));
+			glVertex3f(-BOX_SIZE - (BOX_SIZE/20.0f),-BOX_SIZE - (BOX_SIZE/20.0f),BOX_SIZE + (BOX_SIZE/20.0f));
 			glEnd();
 	glEndList();
 	glVertexPointer(3,GL_FLOAT,sizeof(point),points);
