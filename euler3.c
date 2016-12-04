@@ -12,31 +12,13 @@
 #include <assert.h>
 #include <pthread.h>
 
-#define POINT_COUNT 1048576/4
-#define POINTS_PER_BATCH (1048576/128)
-#define THREAD_COUNT 8
-#define DO_BATCHES
+#define THREAD_COUNT 2
 #define LAG 1
 #define RECALCULATE_COLOR
 //#define LINES
-#define THREEDEE
 #define TIME_STEP 0.02
 #define MOTION_SCALE 0.02
 #define Q_STEP 0.02
-
-#ifndef THREEDEE
-	#define dx(x,y) y
-	#define dy(x,y) -x
-
-#else
-	#define dx(x,y,z) sin(x)*sin(z+q)
-	#define dy(x,y,z) sin(y)*sin(x+q)
-	#define dz(x,y,z) sin(z)*sin(y+q)
-
-	#define ddx(x,y,z) 0.0
-	#define ddy(x,y,z) 0.0
-	#define ddz(x,y,z) 0.0
-#endif
 
 static float t = 0.0;
 static float q = 0.0;
@@ -48,7 +30,6 @@ static unsigned char right = 0;
 static unsigned char qUp = 0;
 static unsigned char qDown = 0;
 static unsigned long activeCount = 0;
-
 
 static unsigned char zoomIn = 0;
 static unsigned char zoomOut = 0;
@@ -95,6 +76,18 @@ struct point
 	float r,g,b;
 };
 typedef struct point point;
+
+struct vec3f
+{
+	float x,y,z;
+};
+typedef struct vec3f vec3f;
+
+static point *points;
+static size_t point_count;
+static size_t num_time_steps;
+
+static vec3f *input_vecs;
 
 void HSVtoRGB( float *r, float *g, float *b,const float hin,const float s,const float v )
 {
@@ -160,31 +153,20 @@ float randRange(const float min, const float max)
 	return (rand()*1.0/RAND_MAX)*(max-min) + min;
 }
 
-// returns true if the point should stay alive.
-float updatePoint(point *restrict const p)
+float updatePoint(size_t point_index)
 {
-	const auto float x = p->x;
-	const auto float y = p->y;
-	#ifdef THREEDEE
-		const auto float z = p->z;
-	#endif
+	vec3f origin = input_vecs[((int) floor(t))*point_count + point_index];
+	vec3f dest = input_vecs[(((int) floor(t)) + 1)*point_count + point_index];
+	const float sub_step = t - floor(t);
+	const auto float dx_ = dest.x - origin.x;
+	const auto float dy_ = dest.y - origin.y;
+	const auto float dz_ = dest.z - origin.z;
+	point *p = points+point_index;
+	p->x = origin.x + (dest.x - origin.x)*sub_step;
+	p->y = origin.y + (dest.y - origin.y)*sub_step;
+	p->z = origin.z + (dest.z - origin.z)*sub_step;
 
-	#ifdef THREEDEE
-		const float dx_  = MOTION_SCALE*(dx(x,y,z));
-		const float dy_  = MOTION_SCALE*(dy(x,y,z));
-		const float dz_  = MOTION_SCALE*(dz(x,y,z));
-	#else
-		const float dx_  = MOTION_SCALE*(dx(x,y));
-		const float dy_  = MOTION_SCALE*(dy(x,y));
-	#endif
-	p->x += dx_;
-	p->y += dy_;
-	#ifdef THREEDEE
-		p->z += dz_;
-		const float vel = sqrt(dx_*dx_ + dy_*dy_ + dz_*dz_);
-	#else
-		const float vel = sqrt(dx_*dx_ + dy_*dy_);
-	#endif
+	const float vel = sqrt(dx_*dx_ + dy_*dy_ + dz_*dz_);
 
 	auto float r,g,b;
 	HSVtoRGB(&r,&g,&b, 240 - (vel/highestSpeed)*240, 1.0, 1.0);
@@ -199,14 +181,10 @@ point getRandPoint(void)
 {
 	const point p = {randRange(-10.0,10.0),
 					randRange(-10.0,10.0),
-					#ifdef THREEDEE
 					randRange(-10.0,10.0),
-					#endif
 					0.0,0.0,0.0};
 	return p;
 }
-
-static point *points;
 
 struct update_thread_info {
 	size_t offset;
@@ -218,14 +196,8 @@ void *update_thread(void *ptr) {
 	update_thread_info *info = (update_thread_info *)ptr;
 	float highestvel = 0.0;
 	for (size_t i = 0; i < info->amount; i++) {
-		#ifdef DO_BATCHES
-		if ((info->offset + i) < activeCount) {
-		#endif
-			float x = updatePoint(points + info->offset + i);
-			if (x > highestvel) highestvel = x;
-		#ifdef DO_BATCHES
-		}
-		#endif
+		float x = updatePoint(info->offset + i);
+		if (x > highestvel) highestvel = x;
 	}
 	float *const result = malloc(sizeof(float));
 	*result = highestvel;
@@ -235,6 +207,64 @@ void *update_thread(void *ptr) {
 
 signed int main(const signed int argc , const char **argv)
 {
+	if (argc != 2) {
+		printf("Usage: ./euler3 [input file]\n");
+		return -5;
+	}
+
+	FILE *inpFile;
+	long int inpFileLen;
+	char *inpBuf;
+	size_t inpCols = 1;
+
+	inpFile = fopen(argv[1], "r");
+	if (!inpFile) {
+		fprintf(stderr, "Unable to open input file\n");
+		return -6;
+	}
+
+	fseek(inpFile, 0, SEEK_END);
+	inpFileLen = ftell(inpFile);
+	inpBuf = malloc(inpFileLen);
+	if (!inpBuf) {
+		fclose(inpFile);
+		return -7;
+	}
+
+	if (fread((void *) inpBuf, inpFileLen, 1, inpFile) != inpFileLen) {
+		fclose(inpFile);
+		fprintf(stderr, "Error reading from input file\n");
+		return -8;
+	}
+	fclose(inpFile);
+
+	char *curr;
+
+	for (curr = inpBuf; *curr != EOF; ++curr) {
+		if (*curr == '\n') {
+			++num_time_steps;
+		} else if (inpRows == 1 && *curr == ' ') {
+			++inpCols;
+		}
+	}
+
+	point_count = inpCols / 3;
+
+	input_vecs = malloc(sizeof(vec3f) * point_count * num_time_steps);
+	if (!input_vecs) {
+		return -7;
+	}
+
+	curr = inpBuf;
+	for (size_t i = 0; i < point_count * num_time_steps; ++i) {
+		input_vecs[i].x = strtof(curr, &curr);
+		input_vecs[i].y = strtof(curr, &curr);
+		input_vecs[i].z = strtof(curr, &curr);
+	}
+
+	free(inpBuf);
+
+
 	if (!glfwInit())
 		return -1;
 	glfwWindowHint(GLFW_DEPTH_BITS,16);
@@ -250,52 +280,36 @@ signed int main(const signed int argc , const char **argv)
 	glfwSetTime(0.0);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	#ifdef THREEDEE
-		//gluPerspective(60,1.0,0.1,100.0);
-		glhPerspectivef2(60,1.0,0.1,100.0);
-	#else
-		glOrtho(-10.0f,10.0f,-10.0f,10.0f,-1.0f,1.0f);
-	#endif
+	//gluPerspective(60,1.0,0.1,100.0);
+	glhPerspectivef2(60,1.0,0.1,100.0);
 
 	glMatrixMode(GL_MODELVIEW);
-	#ifdef THREEDEE
-		glEnable(GL_DEPTH_TEST);
-	#endif
+	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_POINT_SMOOTH);
 	glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
 
-	srand(time(NULL));
-	points = malloc(sizeof(point)*POINT_COUNT);
+	points = malloc(sizeof(point)*point_count);
+
 	if (!points) {
 		glfwDestroyWindow(window);
 		glfwTerminate();
 		return -15;
 	}
-	for (auto unsigned long x = 0; x < POINT_COUNT; x++) {
-		#ifndef DO_BATCHES
-			auto point p = getRandPoint();
-			points[x] = p;
-		#else
-			auto point p = getRandPoint();
-			points[x] = p;
-		#endif
+	for (auto unsigned long x = 0; x < point_count; x++) {
+		points[x].x = input_vecs[x].x;
+		points[x].y = input_vecs[x].y;
+		points[x].z = input_vecs[x].z;
+		points[x].r = 0.0f;
+		points[x].g = 0.0f;
+		points[x].b = 0.0f;
 	}
 
 	glColor3f(1.0f,1.0f,1.0f);
 
-	#ifdef DO_BATCHES
-		auto unsigned long pointForRemoval = 0;
-	#else
-		activeCount = POINT_COUNT;
-	#endif
+	activeCount = point_count;
 
-	#ifdef THREEDEE
-		auto float xRot = 0.0f;
-		auto float yRot = 0.0f;
-	#else
-		auto float translateX = 0.0f;
-		auto float translateY = 0.0f;
-	#endif
+	auto float xRot = 0.0f;
+	auto float yRot = 0.0f;
 
 	auto float zoom = 1.0f;
 	glPointSize(1.0);
@@ -364,79 +378,48 @@ signed int main(const signed int argc , const char **argv)
 		//	break;
 		if (!paused) {
 			t += TIME_STEP;
+			if (((int) floor(t)) >= num_time_steps - 1) {
+				t = 0.0f;
+			}
 		}
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glLoadIdentity();
-		#ifdef THREEDEE
-			glTranslatef(0.0f,0.0f,-15.0f);
-			glScalef(0.4f,0.4f,0.4f);
-			glRotatef(xRot,1.0f,0.0f,0.0f);
-			glRotatef(yRot,0.0f,1.0f,0.0f);
-		#endif
+		glTranslatef(0.0f,0.0f,-15.0f);
+		glScalef(0.4f,0.4f,0.4f);
+		glRotatef(xRot,1.0f,0.0f,0.0f);
+		glRotatef(yRot,0.0f,1.0f,0.0f);
 
 		glScalef(zoom,zoom,zoom);
-		#ifndef THREEDEE
-			glTranslatef(translateX,translateY,0.0);
-		#endif
 
 		if (zoomOut)
 			zoom *= 0.95;
 		if (zoomIn)
 			zoom *= 1.05;
-		#ifdef THREEDEE
-			if (left)
-				yRot -= 1.0f;
-			if (right)
-				yRot += 1.0f;
-			if (down)
-				xRot += 1.0f;
-			if (up)
-				xRot -= 1.0f;
-			if (xRot > 90.0f)
-				xRot = 90.0f;
-			if (xRot < -90.0f)
-				xRot = -90.0f;
-		#else
-			if (left)
-				translateX += 0.3/zoom;
-			if (up)
-				translateY -= 0.3/zoom;
-			if (right)
-				translateX -= 0.3/zoom;
-			if (down)
-				translateY += 0.3/zoom;
-		#endif
+		if (left)
+			yRot -= 1.0f;
+		if (right)
+			yRot += 1.0f;
+		if (down)
+			xRot += 1.0f;
+		if (up)
+			xRot -= 1.0f;
+		if (xRot > 90.0f)
+			xRot = 90.0f;
+		if (xRot < -90.0f)
+			xRot = -90.0f;
 
 		//drawbox
-		#ifdef THREEDEE
 		#ifdef BOX
 			glCallList(boxList);
-			#endif
 		#endif
-
-
-		#ifdef DO_BATCHES
-			for (auto unsigned long i = 0; i < POINTS_PER_BATCH && !paused; i++) {
-				const point p = getRandPoint();
-				points[pointForRemoval] = p;
-				pointForRemoval++;
-				if (pointForRemoval >= POINT_COUNT)
-					pointForRemoval = 0;
-				activeCount++;
-				if (activeCount >= POINT_COUNT) {
-					activeCount = POINT_COUNT;
-				}
-			}
-		#endif
-
 
 		update_thread_info infos[THREAD_COUNT];
 		if (!paused) {
 			pthread_t pids[THREAD_COUNT];
 			for (unsigned short i = 0; i < THREAD_COUNT; i++) {
-				infos[i].offset = i * (POINT_COUNT / THREAD_COUNT);
-				infos[i].amount = POINT_COUNT / THREAD_COUNT;
+				infos[i].offset = i * (point_count / THREAD_COUNT);
+				infos[i].amount = point_count / THREAD_COUNT;
 				pthread_create(pids+i, NULL, &update_thread,(void *) (infos+i));
 			}
 			float *results[THREAD_COUNT];
@@ -454,11 +437,8 @@ signed int main(const signed int argc , const char **argv)
 			}
 		}
 
-		#ifdef THREEDEE
 		#ifndef LINES
-
 		glDrawArrays(GL_POINTS,0,activeCount);
-		#endif
 		#endif
 
 		if (qUp) q += Q_STEP;
