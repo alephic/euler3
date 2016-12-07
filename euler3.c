@@ -313,7 +313,7 @@ signed int main(const signed int argc , const char **argv)
 	auto float yRot = 0.0f;
 
 	auto float zoom = 10.0f/BOX_SIZE;
-	glPointSize(10.0);
+	glPointSize(6.0);
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
