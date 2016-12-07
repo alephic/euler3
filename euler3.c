@@ -18,11 +18,11 @@
 #define LAG 1
 #define RECALCULATE_COLOR
 //#define LINES
-#define TIME_STEP 0.02
+#define TIME_STEP 1.0
 #define MOTION_SCALE 0.02
 #define Q_STEP 0.02
 #define BOX
-#define BOX_SIZE 200.0f
+#define BOX_SIZE 40.0f
 
 static float t = 0.0;
 static float q = 0.0;
